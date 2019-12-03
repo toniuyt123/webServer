@@ -4,28 +4,71 @@ const path = require('path');
 
 const server = net.createServer();
 
+const codes = {
+  200: 'OK',
+  404: 'Not Found',
+  405: 'Method Not Allowed',
+  500: 'Internal Server Error',
+};
+
+const routes = {};
+
 server.on('connection', (socket) => {
 
   socket.on('data', (data) => {
-    console.log('Data sent to server : ' + data);
-    const req = parseRequest(data);
-    console.log(req);
+    const { req, res } = parseRequest(data);
 
     if (req.url) {
       const filepath = path.join(__dirname, `.${req.url}`);
-
+      const handler = routes[req.url]; 
+  
       if (fs.existsSync(filepath)) {
-        const file = fs.readFileSync(filepath);
+        if (fs.lstatSync(filepath).isFile()) {
+          const file = fs.readFileSync(filepath);
 
-        return socket.end(file);
+          return socket.end(file)
+        }
+      } else if (handler) {
+        if (handler.methods.includes(req.method)) {
+          handler.cb(req, res);
+          
+          return socket.end(JSON.stringify(res));
+        }
+  
+        constructStatus(res, 405); 
+      } else  {
+        constructStatus(res, 404); 
       }
     }
 
-    socket.end();
+    console.log(res);
+    return socket.end(JSON.stringify(res));
   });
 });
 
-server.listen(2222);
+const listen = (port) => {
+  server.listen(port);
+}
+
+const get = (route, cb) => {
+  routeWrapper(route, cb, ['GET']);
+};
+
+const post = (route, cb) => {
+  routeWrapper(route, cb, ['POST']);
+};
+
+const all = (route, cb) => {
+  routeWrapper(route, cb, ['GET, POST']);
+};
+
+const routeWrapper = (route, cb, methods) => {
+  routes[route] = {
+    type: 'handler',
+    methods,
+    cb,
+  };
+};
 
 const parseRequest = (rawHTTP) => {
   rawHTTP = rawHTTP.toString();
@@ -39,6 +82,8 @@ const parseRequest = (rawHTTP) => {
     query: parseUrlEncoded(firstLineTokens[1].split('?')[1]),
     body: {},
   };
+
+  const res = {};
 
   // first line already parsed
   for (let i = 1; i < lines.length; i++) {
@@ -67,14 +112,18 @@ const parseRequest = (rawHTTP) => {
 
         if (req['content-type'] === 'application/x-www-form-urlencoded') {
           req.query = { ...req.query, ...parseUrlEncoded(content) };
-        } if (req['content-type'] === 'application/json') {
+        } else if (req['content-type'] === 'application/json') {
           req.body = { ...JSON.parse(content) };
+        } else if (req['content-type'] === 'text/plain') {
+          req.body = { content };
+        } else if (req['content-type'] === 'multipart/form-data') {
+
         }
       }
     }
   }
 
-  return req;
+  return { req, res };
 };
 
 const parseUrlEncoded = (query) => {
@@ -93,3 +142,15 @@ const parseUrlEncoded = (query) => {
 
   return {};
 }
+
+const constructStatus = (res, code) => {
+  res.statusCode = code;
+  res.statusMessage = codes[code];
+}
+
+module.exports = {
+  get,
+  post,
+  all,
+  listen,
+};

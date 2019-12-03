@@ -1,8 +1,8 @@
-var http = require('http');
+const app = require('./webServer');
 
-//create a server object:
-http.createServer(function (req, res) {
-  console.log(req);
-  res.write('Hello World!'); //write a response to the client
-  res.end(); //end the response
-}).listen(2223);
+app.get('/test', (req, res) => {
+  console.log(req, res);
+  res.ye = 'Hello';
+});
+
+app.listen(2222);
