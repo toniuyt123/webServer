@@ -1,49 +1,97 @@
 import socket
 import selectors
 import types
+import json
+import os.path
+from utils import Request, Response
 
-def accept_wrapper(sock):
-  conn, addr = sock.accept()  # Should be ready to read
-  print('accepted connection from', addr)
-  conn.setblocking(False)
-  data = types.SimpleNamespace(addr=addr, inb=b'', outb=b'')
-  events = selectors.EVENT_READ | selectors.EVENT_WRITE
-  sel.register(conn, events, data=data)
+def parseUrlEncoded(query):
+  if (query):
+    params = query.split('&')
+    result = {}
 
-def service_connection(key, mask):
-  sock = key.fileobj
-  data = key.data
+    for param in params:
+      [key, value] = param.split('=')
 
-  if mask & selectors.EVENT_READ:
-    recv_data = sock.recv(1024)  # Should be ready to read
-    if recv_data:
-      data.outb += recv_data
-    else:
-      print('closing connection to', data.addr)
-      sel.unregister(sock)
-      sock.close()
-  if mask & selectors.EVENT_WRITE:
-    if data.outb:
-      print('echoing', repr(data.outb), 'to', data.addr)
-      sent = sock.send(data.outb)  # Should be ready to write
-      data.outb = data.outb[sent:]
+      result[key] = value
 
-host = '127.0.0.1'
-port = 5000
+    return result
+
+  return {}
+
+def handleHTTP(clientcoket):
+  data = b''
+  
+  while True:
+    chunk = clientcoket.recv(1024); 
+
+    if not chunk:
+      break
+
+    data += chunk
+
+  lines = data.decode('utf-8').split('\r\n')
+  headers = {}
+  body = {}
+
+  for i in range(1, len(lines)):
+    line = lines[i]
+
+    try:
+      if (len(line) > 0):
+        [key, value] = line.split(': ', 1)
+        headers[key.lower()] = value
+
+        if (key.lower() == 'content-type'):
+          content = ''
+          length = int(headers['content-length'])
+
+          while (len(content) < length):
+            i += 1
+            content += lines[i]
+
+          if (value == 'text/plain'):
+            body = content
+          elif (value == 'application/json'):
+            body = json.loads(content)
+          elif (value == 'application/x-www-form-urlencoded'):
+            body = parseUrlEncoded(content)
+
+    except ValueError:
+      print('To do')
+
+  return Request(*lines[0].split(' '), headers, body)
+
+try:
+  with open('config.json') as config_file:
+    config = json.load(config_file)
+except FileNotFoundError:
+  config = {}
+
+host = config.get('host', 'localhost')
+port = config.get('port', 5001)
+route_handlers = {}
 
 sel = selectors.DefaultSelector()
-lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-lsock.bind((host, port))
-lsock.listen()
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.bind((host, port))
+sock.listen()
+sock.setblocking(True)
+
 print('listening on', (host, port))
-lsock.setblocking(True)
-sel.register(lsock, selectors.EVENT_READ, data=None)
 
 while True:
-  events = sel.select(timeout=None)
-  for key, mask in events:
-    if key.data is None:
-      accept_wrapper(key.fileobj)
-    else:
-      service_connection(key, mask)
+  (clientsocket, address) = sock.accept()
+
+  req = handleHTTP(clientsocket)
+  res = Response(clientsocket)
+
+  if (req.url in route_handlers):
+    route_handlers[req.url](req, res)
+  elif (os.path.isfile(f'.{req.url}')):
+    f = open(f'.{req.url}', 'r')
+    res.set_body(f.read())
+  
+  res.send()
+
 

@@ -1,25 +1,17 @@
 import socket, asyncio
 import json
-  
-class Request:
-  def __init__(self, method, url, HTTP_version, headers):
-    self.method = method
-    self.url = url
-    self.headers = headers
-    self.HTTP_version = HTTP_version
+from request import Request
 
 async def handler(reader, writer):
   data = b''
 
   while True:
-    chunk = await reader.read()  # Max number of bytes to read
+    chunk = await reader.read()
 
     if not chunk:
       break
     
     data += chunk
-
-  print(data)
 
   lines = data.decode('utf-8').split('\r\n')
   headers = {}
