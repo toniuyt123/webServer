@@ -1,10 +1,11 @@
 class Request:
-  def __init__(self, method, url, HTTP_version, headers, body={}):
+  def __init__(self, method, url, HTTP_version, headers, rawHTTP, body = None):
     self.method = method
     self.url = url
     self.headers = headers
     self.HTTP_version = HTTP_version
-    self.body = body
+    self.rawHTTP = rawHTTP
+    self.body = body or {}
 
 class Response:
   codes = {

@@ -20,6 +20,9 @@ class RouteHandler(Handler):
   def handleRequest(self, req, res):
     if req.url in RouteHandler.route_handlers:
       RouteHandler.route_handlers[req.url](req, res)
+    else:
+      res.status_code = 404
+      res.send()
 
   def addRoute(self, route, handler):
     if callable(handler):

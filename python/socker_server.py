@@ -1,10 +1,11 @@
 import socket
 import json
+from logs import Logger
 from utils import Request, Response
 from handlers import getHandler
 
 def parseUrlEncoded(query):
-  if (query):
+  try:
     params = query.split('&')
     result = {}
 
@@ -14,6 +15,8 @@ def parseUrlEncoded(query):
       result[key] = value
 
     return result
+  except ValueError:
+    pass
 
   return {}
 
@@ -63,7 +66,7 @@ def parseHTTP(clientcoket):
 
       break
 
-  return Request(*lines[0].split(' '), headers, body)
+  return Request(*lines[0].split(' '), headers, data, body)
 
 try:
   with open('config.json') as config_file:
@@ -74,6 +77,7 @@ except FileNotFoundError:
 host = config.get('host', 'localhost')
 port = config.get('port', 5000)
 handler = getHandler(config.get('handler', 'route'))
+logger = Logger('./')
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind((host, port))
@@ -93,5 +97,5 @@ while True:
 
   req = parseHTTP(clientsocket)
   res = Response(clientsocket)
-
+  logger.log(req)
   handler.handleRequest(req, res)
