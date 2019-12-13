@@ -1,9 +1,7 @@
 import socket
-import selectors
-import types
 import json
-import os.path
 from utils import Request, Response
+from handlers import getHandler
 
 def parseUrlEncoded(query):
   if (query):
@@ -19,46 +17,51 @@ def parseUrlEncoded(query):
 
   return {}
 
-def handleHTTP(clientcoket):
+def parseHTTP(clientcoket):
   data = b''
+  req_end = 0
+  headers = {}
+  body = {}
   
   while True:
-    chunk = clientcoket.recv(1024); 
+    chunk = clientcoket.recv(1024)
 
     if not chunk:
       break
 
     data += chunk
 
-  lines = data.decode('utf-8').split('\r\n')
-  headers = {}
-  body = {}
+    if not req_end:
+      body_begin = data.decode('utf-8').find('\r\n\r\n')
 
-  for i in range(1, len(lines)):
-    line = lines[i]
+    if body_begin and not req_end:
+      lines = data[:body_begin].decode('utf-8').split('\r\n')
 
-    try:
-      if (len(line) > 0):
-        [key, value] = line.split(': ', 1)
-        headers[key.lower()] = value
+      for i in range(1, len(lines)):
+        line = lines[i]
 
-        if (key.lower() == 'content-type'):
-          content = ''
-          length = int(headers['content-length'])
+        if (len(line) > 0):
+          [key, value] = line.split(': ', 1)
+          headers[key.lower()] = value
 
-          while (len(content) < length):
-            i += 1
-            content += lines[i]
+      if 'content-length' in headers:
+        req_end = int(headers['content-length']) + body_begin + 4
+      else:
+        req_end = body_begin + 4
 
-          if (value == 'text/plain'):
-            body = content
-          elif (value == 'application/json'):
-            body = json.loads(content)
-          elif (value == 'application/x-www-form-urlencoded'):
-            body = parseUrlEncoded(content)
+    if len(data) == req_end and body_begin:
+      if 'content-type' in headers:
+        content = data[body_begin + 4:]
+        value = headers['content-type']
 
-    except ValueError:
-      print('To do')
+        if (value == 'text/plain'):
+          body = content
+        elif (value == 'application/json'):
+          body = json.loads(content)
+        elif (value == 'application/x-www-form-urlencoded'):
+          body = parseUrlEncoded(content.decode())
+
+      break
 
   return Request(*lines[0].split(' '), headers, body)
 
@@ -69,10 +72,9 @@ except FileNotFoundError:
   config = {}
 
 host = config.get('host', 'localhost')
-port = config.get('port', 5001)
-route_handlers = {}
+port = config.get('port', 5000)
+handler = getHandler(config.get('handler', 'route'))
 
-sel = selectors.DefaultSelector()
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind((host, port))
 sock.listen()
@@ -80,18 +82,16 @@ sock.setblocking(True)
 
 print('listening on', (host, port))
 
+def test(req, res):
+  res.set_body('yee')
+  res.send()
+
+handler.addRoute('/test', test)
+
 while True:
   (clientsocket, address) = sock.accept()
 
-  req = handleHTTP(clientsocket)
+  req = parseHTTP(clientsocket)
   res = Response(clientsocket)
 
-  if (req.url in route_handlers):
-    route_handlers[req.url](req, res)
-  elif (os.path.isfile(f'.{req.url}')):
-    f = open(f'.{req.url}', 'r')
-    res.set_body(f.read())
-  
-  res.send()
-
-
+  handler.handleRequest(req, res)
