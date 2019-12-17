@@ -1,5 +1,6 @@
 import socket
 import json
+import os
 from logs import Logger
 from utils import Request, Response
 from handlers import getHandler
@@ -75,14 +76,14 @@ except FileNotFoundError:
   config = {}
 
 host = config.get('host', 'localhost')
-port = config.get('port', 5000)
+port = config.get('port', 50010)
 handler = getHandler(config.get('handler', 'route'))
 logger = Logger('./')
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind((host, port))
 sock.listen()
-sock.setblocking(True)
+# sock.setblocking(True)
 
 print('listening on', (host, port))
 
@@ -92,10 +93,17 @@ def test(req, res):
 
 handler.addRoute('/test', test)
 
+i = 1
 while True:
   (clientsocket, address) = sock.accept()
+  child_pid = os.fork()
+  if child_pid == 0:
+    req = parseHTTP(clientsocket)
+    res = Response(clientsocket)
+    logger.log(req)
+    handler.handleRequest(req, res)
+    break
+  else: 
+    i += 1
 
-  req = parseHTTP(clientsocket)
-  res = Response(clientsocket)
-  logger.log(req)
-  handler.handleRequest(req, res)
+  print(i)
