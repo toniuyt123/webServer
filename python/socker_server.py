@@ -69,7 +69,13 @@ def parseHTTP(clientcoket):
           headers['files'] = parseMultipart(boundary, content)
       break
 
-  return Request(*lines[0].split(' '), headers, data, body)
+  url = lines[0].split(' ')[1]
+  query = {}
+
+  if '?' in url:
+    query = parseUrlEncoded(url.split('?')[1])
+
+  return Request(*lines[0].split(' '), headers, data, body, query)
 
 try:
   with open('config.json') as config_file:
@@ -78,7 +84,7 @@ except FileNotFoundError:
   config = {}
 
 host = config.get('host', 'localhost')
-port = config.get('port', 5001)
+port = config.get('port', 5000)
 handler = getHandler(config.get('handler', 'route'))
 logger = Logger('./')
 
@@ -105,6 +111,24 @@ def saveFile(req, res):
 
   res.send()
 
+def sendFile(req, res):
+  if 'filename' in req.body:
+    filename = req.body['filename']
+  elif 'filename' in req.query:
+    filename = req.query['filename']
+
+  if (filename != None):
+    f = open(f'./files/{filename}', 'r')
+    res.set_headers({
+      'content-disposition': f'attachment; filename={filename}'
+    })
+
+    res.send(f.read())
+  else:
+    res.status_code = 404
+    res.send()
+  
+
 def ramTest(req, res):
   res.status_code = 200
   res.send()
@@ -112,18 +136,32 @@ def ramTest(req, res):
 handler.addRoute('/test', test)
 handler.addRoute('/error', errTest)
 handler.addRoute('/saveFile', saveFile)
+handler.addRoute('/sendFile', sendFile)
 handler.addRoute('/ramTest', saveFile)
+
+activeChildren = []
+
+def reapChildren():
+  while activeChildren:
+    print(activeChildren)
+    pid, stat = os.waitpid(0, os.WNOHANG)
+    if not pid: break
+    activeChildren.remove(pid)
 
 i = 1
 while True:
   (clientsocket, address) = sock.accept()
+  # reapChildren()
   child_pid = os.fork()
+
   if child_pid == 0:
     req = parseHTTP(clientsocket)
     res = Response(clientsocket)
     logger.logAccess(req)
     handler.handleRequest(req, res)
+    # os._exit(0)
     break
-  else: 
+  else:
+    # activeChildren.append(child_pid)
+    # print(activeChildren)
     i += 1
-    print(i)

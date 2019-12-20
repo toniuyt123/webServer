@@ -22,9 +22,11 @@ class RouteHandler(Handler):
   route_handlers = {}
 
   def handleRequest(self, req, res):
-    if req.url in RouteHandler.route_handlers:
+    url = req.url.split('?')[0]
+
+    if url in RouteHandler.route_handlers:
       try:
-        RouteHandler.route_handlers[req.url](req, res)
+        RouteHandler.route_handlers[url](req, res)
       except Exception as e:
         logger.logError(500, e)
         res.status_code = 500
