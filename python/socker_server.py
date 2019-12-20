@@ -1,3 +1,4 @@
+import time
 import socket
 import json
 import os
@@ -36,6 +37,7 @@ def parseHTTP(clientcoket):
     data += chunk
 
     if not req_end:
+      print(str(data))
       body_begin = data.decode('utf-8').find('\r\n\r\n')
 
     if body_begin and not req_end:
@@ -143,15 +145,13 @@ activeChildren = []
 
 def reapChildren():
   while activeChildren:
-    print(activeChildren)
     pid, stat = os.waitpid(0, os.WNOHANG)
     if not pid: break
     activeChildren.remove(pid)
+    print(activeChildren)
 
-i = 1
 while True:
   (clientsocket, address) = sock.accept()
-  # reapChildren()
   child_pid = os.fork()
 
   if child_pid == 0:
@@ -159,9 +159,6 @@ while True:
     res = Response(clientsocket)
     logger.logAccess(req)
     handler.handleRequest(req, res)
-    # os._exit(0)
-    break
+    os._exit(0)
   else:
-    # activeChildren.append(child_pid)
-    # print(activeChildren)
-    i += 1
+    activeChildren.append(child_pid)

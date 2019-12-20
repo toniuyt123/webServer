@@ -45,7 +45,9 @@ class Response:
     if data != None:
       self.set_body(data)
 
-    print(self.toBytes())
+    if 'content-length' not in self.headers:
+      self.headers['content-length'] = 0
+
     self.socket.sendall(self.toBytes())
     self.socket.close()
 
