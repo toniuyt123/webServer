@@ -2,7 +2,7 @@ import socket
 import json
 import os
 from logs import Logger
-from utils import Request, Response
+from utils import Request, Response, parseMultipart
 from handlers import getHandler
 
 def parseUrlEncoded(query):
@@ -64,7 +64,9 @@ def parseHTTP(clientcoket):
           body = json.loads(content)
         elif (value == 'application/x-www-form-urlencoded'):
           body = parseUrlEncoded(content.decode())
-
+        elif ('multipart/form-data;' in value):
+          boundary = value.split('=', 1)[1]
+          headers['files'] = parseMultipart(boundary, content)
       break
 
   return Request(*lines[0].split(' '), headers, data, body)
@@ -76,7 +78,7 @@ except FileNotFoundError:
   config = {}
 
 host = config.get('host', 'localhost')
-port = config.get('port', 50010)
+port = config.get('port', 5001)
 handler = getHandler(config.get('handler', 'route'))
 logger = Logger('./')
 
@@ -91,7 +93,26 @@ def test(req, res):
   res.set_body('yee')
   res.send()
 
+def errTest(req, res):
+  raise Exception('This is test error')
+
+def saveFile(req, res):
+  if (req.headers['files'] != None):
+    for [filename, body] in req.headers['files'].items():
+      f = open(f'./files/{filename}', 'w')
+      f.write(body)
+      f.close()
+
+  res.send()
+
+def ramTest(req, res):
+  res.status_code = 200
+  res.send()
+
 handler.addRoute('/test', test)
+handler.addRoute('/error', errTest)
+handler.addRoute('/saveFile', saveFile)
+handler.addRoute('/ramTest', saveFile)
 
 i = 1
 while True:
@@ -100,10 +121,9 @@ while True:
   if child_pid == 0:
     req = parseHTTP(clientsocket)
     res = Response(clientsocket)
-    logger.log(req)
+    logger.logAccess(req)
     handler.handleRequest(req, res)
     break
   else: 
     i += 1
-
-  print(i)
+    print(i)

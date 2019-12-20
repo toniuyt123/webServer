@@ -1,4 +1,7 @@
 import os.path
+from logs import Logger
+
+logger = Logger('./')
 
 class Handler:
   def handleRequest(self, req, res):
@@ -11,6 +14,7 @@ class StaticHandler(Handler):
       res.set_body(f.read())
       res.send()
     else:
+      logger.logError(404)
       res.status_code = 404
       res.send()
 
@@ -19,8 +23,14 @@ class RouteHandler(Handler):
 
   def handleRequest(self, req, res):
     if req.url in RouteHandler.route_handlers:
-      RouteHandler.route_handlers[req.url](req, res)
+      try:
+        RouteHandler.route_handlers[req.url](req, res)
+      except Exception as e:
+        logger.logError(500, e)
+        res.status_code = 500
+        res.send()
     else:
+      logger.logError(404)
       res.status_code = 404
       res.send()
 

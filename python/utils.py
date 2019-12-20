@@ -18,7 +18,7 @@ class Response:
   def __init__(self, socket, HTTP_version = 1.1, status_code = 200, headers = None, body = ''):
     self.socket = socket
     self.status_code = status_code
-    self.headers = headers or {}
+    self.headers = headers or { 'content-type': 'text/plain', 'content-length': 0 }
     self.HTTP_version = HTTP_version
     self.body = body
 
@@ -40,3 +40,21 @@ class Response:
 
     self.socket.sendall(self.toBytes())
     self.socket.close()
+
+def parseMultipart(boundary, content):
+  files = {}
+
+  parts = str(content).split(f'--{boundary}')[1:-1]
+
+  for part in parts:
+    current_file = part.split('\\r\\n')[1:-1]
+    filename = ''
+
+    for hpart in current_file[0].split(';'):
+      if hpart.find('="') > 0:
+        [key, value] = hpart.split('="')
+
+        filename = value[:-1]
+    files[filename] = current_file[-1]
+
+  return files
