@@ -3,31 +3,16 @@ import socket
 import json
 import os
 from logs import Logger
-from utils import Request, Response, parseMultipart
+from utils import Request, Response, parseMultipart, parseUrlEncoded
 from handlers import getHandler
-
-def parseUrlEncoded(query):
-  try:
-    params = query.split('&')
-    result = {}
-
-    for param in params:
-      [key, value] = param.split('=')
-
-      result[key] = value
-
-    return result
-  except ValueError:
-    pass
-
-  return {}
 
 def parseHTTP(clientcoket):
   data = b''
   req_end = 0
   headers = {}
   body = {}
-  
+  lines = []
+
   while True:
     chunk = clientcoket.recv(1024)
 
@@ -37,11 +22,12 @@ def parseHTTP(clientcoket):
     data += chunk
 
     if not req_end:
-      print(str(data))
+      # print(str(data))
       body_begin = data.decode('utf-8').find('\r\n\r\n')
 
     if body_begin and not req_end:
       lines = data[:body_begin].decode('utf-8').split('\r\n')
+      print(lines)
 
       for i in range(1, len(lines)):
         line = lines[i]
@@ -71,6 +57,7 @@ def parseHTTP(clientcoket):
           headers['files'] = parseMultipart(boundary, content)
       break
 
+  # print(lines)
   url = lines[0].split(' ')[1]
   query = {}
 
@@ -126,6 +113,8 @@ def sendFile(req, res):
     })
 
     res.send(f.read())
+    f.close()
+
   else:
     res.status_code = 404
     res.send()
@@ -135,11 +124,19 @@ def ramTest(req, res):
   res.status_code = 200
   res.send()
 
+def add(req, res):
+  sum_result = (int)(req.body['a'] or 0) + (int)(req.body['b'] or 0)
+
+  print(sum_result)
+
+  res.send(str(sum_result))
+
 handler.addRoute('/test', test)
 handler.addRoute('/error', errTest)
 handler.addRoute('/saveFile', saveFile)
 handler.addRoute('/sendFile', sendFile)
 handler.addRoute('/ramTest', saveFile)
+handler.addRoute('/sum', add)
 
 activeChildren = []
 
@@ -148,17 +145,21 @@ def reapChildren():
     pid, stat = os.waitpid(0, os.WNOHANG)
     if not pid: break
     activeChildren.remove(pid)
-    print(activeChildren)
+    # print(activeChildren)
 
 while True:
   (clientsocket, address) = sock.accept()
+  # reapChildren()
   child_pid = os.fork()
 
   if child_pid == 0:
     req = parseHTTP(clientsocket)
     res = Response(clientsocket)
     logger.logAccess(req)
+
     handler.handleRequest(req, res)
+    clientsocket.close()
     os._exit(0)
   else:
-    activeChildren.append(child_pid)
+    pass
+    #activeChildren.append(child_pid)

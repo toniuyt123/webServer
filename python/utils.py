@@ -8,7 +8,7 @@ class Request:
     self.body = body or {}
     self.query = query or {}
 
-class Response:
+class BaseResponse:
   codes = {
     200: 'OK',
     404: 'Not Found',
@@ -16,8 +16,7 @@ class Response:
     500: 'Internal Server Error'
   } 
 
-  def __init__(self, socket, HTTP_version = 1.1, status_code = 200, headers = None, body = ''):
-    self.socket = socket
+  def __init__(self, HTTP_version = 1.1, status_code = 200, headers = None, body = ''):
     self.status_code = status_code
     self.headers = headers or {}
     self.HTTP_version = HTTP_version
@@ -41,6 +40,11 @@ class Response:
 
     return (http_begin + self.body).encode()
 
+class Response(BaseResponse):
+  def __init__(self, socket, HTTP_version = 1.1, status_code = 200, headers = None, body = ''):
+    self.socket = socket
+    super().__init__(HTTP_version, status_code, headers, body)
+
   def send(self, data = None):
     if data != None:
       self.set_body(data)
@@ -49,7 +53,20 @@ class Response:
       self.headers['content-length'] = 0
 
     self.socket.sendall(self.toBytes())
-    self.socket.close()
+
+class AsyncResponse(BaseResponse):
+  def __init__(self, writer, HTTP_version = 1.1, status_code = 200, headers = None, body = ''):
+    self.writer = writer
+    super().__init__(HTTP_version, status_code, headers, body)
+
+  async def send(self, data = None):
+    if data != None:
+      self.set_body(data)
+
+    self.writer.write(self.toBytes())
+    await self.writer.drain()
+
+    self.writer.close()
 
 def parseMultipart(boundary, content):
   files = {}
@@ -68,3 +85,19 @@ def parseMultipart(boundary, content):
     files[filename] = current_file[-1]
 
   return files
+
+def parseUrlEncoded(query):
+  try:
+    params = query.split('&')
+    result = {}
+
+    for param in params:
+      [key, value] = param.split('=')
+
+      result[key] = value
+
+    return result
+  except ValueError:
+    pass
+
+  return {}

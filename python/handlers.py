@@ -11,7 +11,14 @@ class StaticHandler(Handler):
   def handleRequest(self, req, res):
     if os.path.isfile(f'.{req.url}'):
       f = open(f'.{req.url}', 'r')
+
+
       res.set_body(f.read())
+
+      if (req.url.split('.')[1] == 'html'):
+        res.set_headers({ 'content-type': 'text/html' })
+  
+      f.close()
       res.send()
     else:
       logger.logError(404)
@@ -35,6 +42,21 @@ class RouteHandler(Handler):
       logger.logError(404)
       res.status_code = 404
       res.send()
+
+  async def handleAsync(self, req, res):
+    url = req.url.split('?')[0]
+
+    if url in RouteHandler.route_handlers:
+      try:
+        await RouteHandler.route_handlers[url](req, res)
+      except Exception as e:
+        logger.logError(500, e)
+        res.status_code = 500
+        await res.send()
+    else:
+      logger.logError(404)
+      res.status_code = 404
+      await res.send()
 
   def addRoute(self, route, handler):
     if callable(handler):
