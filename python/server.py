@@ -21,7 +21,28 @@ async def test(req, res):
   res.set_body('yee')
   await res.send()
 
+
+async def sendFile(req, res):
+  if 'filename' in req.body:
+    filename = req.body['filename']
+  elif 'filename' in req.query:
+    filename = req.query['filename']
+
+  if (filename != None):
+    f = open(f'./files/{filename}', 'r')
+    res.set_headers({
+      'content-disposition': f'attachment; filename={filename}'
+    })
+
+    await res.send(f.read())
+    f.close()
+
+  else:
+    res.status_code = 404
+    await res.send()
+
 handler.addRoute('/test', test)
+handler.addRoute('/sendFile', sendFile)
 
 async def handleClient(reader, writer):
   data = b''
@@ -44,7 +65,7 @@ async def handleClient(reader, writer):
 
     if body_begin and not req_end:
       lines = data[:body_begin].decode('utf-8').split('\r\n')
-      print(lines)
+      # print(lines)
 
       for i in range(1, len(lines)):
         line = lines[i]
@@ -83,12 +104,14 @@ async def handleClient(reader, writer):
 
   req = Request(*lines[0].split(' '), headers, data, body, query)
   res = AsyncResponse(writer)
+  logger.logAccess(req)
 
   await handler.handleAsync(req, res)
 
 loop = asyncio.get_event_loop()
 coro = asyncio.start_server(handleClient, host, port, loop=loop)
 server = loop.run_until_complete(coro)
+logger = Logger('./')
 
 print('Serving on {}'.format(server.sockets[0].getsockname()))
 try:

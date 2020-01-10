@@ -27,7 +27,7 @@ class BaseResponse:
       self.headers[key] = value
 
   def set_body(self, body, content_type = 'text/plain'):
-    if ('content-type' in self.headers):
+    if ('content-type' not in self.headers):
       self.headers['content-type'] = content_type
 
     self.headers['content-length'] = len(body)

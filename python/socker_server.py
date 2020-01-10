@@ -27,7 +27,6 @@ def parseHTTP(clientcoket):
 
     if body_begin and not req_end:
       lines = data[:body_begin].decode('utf-8').split('\r\n')
-      print(lines)
 
       for i in range(1, len(lines)):
         line = lines[i]
@@ -145,11 +144,10 @@ def reapChildren():
     pid, stat = os.waitpid(0, os.WNOHANG)
     if not pid: break
     activeChildren.remove(pid)
-    # print(activeChildren)
 
 while True:
   (clientsocket, address) = sock.accept()
-  # reapChildren()
+  reapChildren()
   child_pid = os.fork()
 
   if child_pid == 0:
@@ -161,5 +159,4 @@ while True:
     clientsocket.close()
     os._exit(0)
   else:
-    pass
-    #activeChildren.append(child_pid)
+    activeChildren.append(child_pid)

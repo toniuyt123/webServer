@@ -1,6 +1,0 @@
-
-8,6mb file
-1 concurrent - 0.1% ram 3% cpu
-10 concurrent - 1.7% ram 26% cpu
-100 concurrent - 40% ram 200% cpu
-500 concurrent - 70% ram 240% cpy
