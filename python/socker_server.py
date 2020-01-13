@@ -2,6 +2,7 @@ import time
 import socket
 import json
 import os
+import signal
 from logs import Logger
 from utils import Request, Response, parseMultipart, parseUrlEncoded
 from handlers import getHandler
@@ -84,6 +85,7 @@ sock.listen()
 print('listening on', (host, port))
 
 def test(req, res):
+  time.sleep(5)
   res.set_body('yee')
   res.send()
 
@@ -105,13 +107,22 @@ def sendFile(req, res):
   elif 'filename' in req.query:
     filename = req.query['filename']
 
-  if (filename != None):
-    f = open(f'./files/{filename}', 'r')
-    res.set_headers({
-      'content-disposition': f'attachment; filename={filename}'
-    })
+  path = f'./files/{filename}'
 
-    res.send(f.read())
+  if (filename != None):
+    f = open(path, 'r')
+    res.set_headers({
+      'content-disposition': f'attachment; filename={filename}',
+      'content-length': os.stat(path).st_size
+    })
+    res.send()
+    
+    while True:
+      data = f.read(65536)
+      if not data:
+        break
+      res.sendChunk(data)
+    
     f.close()
 
   else:
@@ -137,26 +148,31 @@ handler.addRoute('/sendFile', sendFile)
 handler.addRoute('/ramTest', saveFile)
 handler.addRoute('/sum', add)
 
-activeChildren = []
+def reapChildren(signum, frame):
+  while 1:
+    try:
+      pid, stat = os.waitpid(-1, os.WNOHANG)
+      if not pid: break
+    except:
+      break 
 
-def reapChildren():
-  while activeChildren:
-    pid, stat = os.waitpid(0, os.WNOHANG)
-    if not pid: break
-    activeChildren.remove(pid)
+def waitChild(signum, frame):
+  pid, stat = os.waitpid(-1, os.WNOHANG)
+
+signal.signal(signal.SIGCHLD, waitChild)
 
 while True:
   (clientsocket, address) = sock.accept()
-  reapChildren()
   child_pid = os.fork()
 
   if child_pid == 0:
     req = parseHTTP(clientsocket)
     res = Response(clientsocket)
-    logger.logAccess(req)
 
     handler.handleRequest(req, res)
     clientsocket.close()
+
+    logger.logAccess(req)
     os._exit(0)
   else:
-    activeChildren.append(child_pid)
+    clientsocket.close()

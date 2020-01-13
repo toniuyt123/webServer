@@ -2,6 +2,7 @@ import socket, asyncio
 import time
 import json
 import os
+import aiofiles
 from logs import Logger
 from utils import Request, AsyncResponse, parseMultipart, parseUrlEncoded
 from handlers import getHandler
@@ -28,14 +29,21 @@ async def sendFile(req, res):
   elif 'filename' in req.query:
     filename = req.query['filename']
 
-  if (filename != None):
-    f = open(f'./files/{filename}', 'r')
-    res.set_headers({
-      'content-disposition': f'attachment; filename={filename}'
-    })
+  path = f'./files/{filename}'
 
-    await res.send(f.read())
-    f.close()
+  if (filename != None):
+    res.set_headers({
+      'content-disposition': f'attachment; filename={filename}',
+      'content-length': os.stat(path).st_size
+    })
+    await res.send()
+
+    async with aiofiles.open(path, mode='rb') as f:
+      while True:
+        data = await f.read(65536)
+        if not data:
+          break
+        await res.sendChunk(data)
 
   else:
     res.status_code = 404
@@ -95,18 +103,21 @@ async def handleClient(reader, writer):
           headers['files'] = parseMultipart(boundary, content)
       break
 
-  # print(lines)
-  url = lines[0].split(' ')[1]
-  query = {}
+  if lines == []:
+    print('err')
+  else:
+    url = lines[0].split(' ')[1]
+    query = {}
 
-  if '?' in url:
-    query = parseUrlEncoded(url.split('?')[1])
+    if '?' in url:
+      query = parseUrlEncoded(url.split('?')[1])
 
-  req = Request(*lines[0].split(' '), headers, data, body, query)
-  res = AsyncResponse(writer)
+    req = Request(*lines[0].split(' '), headers, data, body, query)
+    res = AsyncResponse(writer)
+    await handler.handleAsync(req, res)
+  writer.close()
+
   logger.logAccess(req)
-
-  await handler.handleAsync(req, res)
 
 loop = asyncio.get_event_loop()
 coro = asyncio.start_server(handleClient, host, port, loop=loop)

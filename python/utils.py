@@ -33,6 +33,9 @@ class BaseResponse:
     self.headers['content-length'] = len(body)
     self.body = body
 
+  def write(self, data):
+    self.body += data
+
   def toBytes(self):
     http_begin = (f'HTTP/{self.HTTP_version} {self.status_code} {self.codes[self.status_code]}\r\n' +
       '\r\n'.join(f'{key}: {value}' for [key, value] in self.headers.items()) +
@@ -44,6 +47,9 @@ class Response(BaseResponse):
   def __init__(self, socket, HTTP_version = 1.1, status_code = 200, headers = None, body = ''):
     self.socket = socket
     super().__init__(HTTP_version, status_code, headers, body)
+
+  def sendChunk(self, data):
+    self.socket.sendall(data.encode())
 
   def send(self, data = None):
     if data != None:
@@ -66,7 +72,9 @@ class AsyncResponse(BaseResponse):
     self.writer.write(self.toBytes())
     await self.writer.drain()
 
-    self.writer.close()
+  async def sendChunk(self, data):
+    self.writer.write(data)
+    await self.writer.drain()
 
 def parseMultipart(boundary, content):
   files = {}

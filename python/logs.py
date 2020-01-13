@@ -1,5 +1,6 @@
 import datetime
 import os.path
+import aiofiles
 
 class Logger:
   def __init__(self, path):
@@ -25,6 +26,11 @@ class Logger:
     
     logtext = f'{datetime.datetime.now()} - {req.rawHTTP}\n'
     self.access_log.write(logtext)
+
+  async def logAccessAsync(self, req):
+    async with aiofiles.open(os.path.join(self.path, 'logs/acess', self.filename), mode='a') as f:
+      logtext = f'{datetime.datetime.now()} - {req.rawHTTP}\n'
+      await f.write(logtext)
 
   def logError(self, code, err = ''):
     if (self.filename != str(datetime.date.today())):
