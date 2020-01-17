@@ -1,5 +1,5 @@
 {
   "host": "localhost",
   "port": 5001,
-  "handler": "route"
+  "handler": "wsgi"
 }

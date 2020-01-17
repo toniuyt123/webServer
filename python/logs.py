@@ -22,20 +22,20 @@ class Logger:
   def logAccess(self, req):
     if (self.filename != str(datetime.date.today())):
       self.filename = str(datetime.date.today())
-      self.access_log = open(os.path.join(self.path, 'logs/acess', self.filename), 'a')
+      self.access_log = open(os.path.join(self.path, 'logs/access', self.filename), 'a')
     
     logtext = f'{datetime.datetime.now()} - {req.rawHTTP}\n'
     self.access_log.write(logtext)
 
   async def logAccessAsync(self, req):
-    async with aiofiles.open(os.path.join(self.path, 'logs/acess', self.filename), mode='a') as f:
+    async with aiofiles.open(os.path.join(self.path, 'logs/access', self.filename), mode='a') as f:
       logtext = f'{datetime.datetime.now()} - {req.rawHTTP}\n'
       await f.write(logtext)
 
   def logError(self, code, err = ''):
     if (self.filename != str(datetime.date.today())):
       self.filename = str(datetime.date.today())
-      self.error_log = open(os.path.join(self.path, 'logs/acess', self.filename), 'a')
+      self.error_log = open(os.path.join(self.path, 'logs/access', self.filename), 'a')
     
     logtext = f'{datetime.datetime.now()} - ERROR {code} {err}\n'
     self.error_log.write(logtext)

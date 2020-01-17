@@ -49,8 +49,8 @@ async def sendFile(req, res):
     res.status_code = 404
     await res.send()
 
-handler.addRoute('/test', test)
-handler.addRoute('/sendFile', sendFile)
+# handler.addRoute('/test', test)
+# handler.addRoute('/sendFile', sendFile)
 
 async def handleClient(reader, writer):
   data = b''
@@ -117,7 +117,7 @@ async def handleClient(reader, writer):
     await handler.handleAsync(req, res)
   writer.close()
 
-  logger.logAccess(req)
+  await logger.logAccessAsync(req)
 
 loop = asyncio.get_event_loop()
 coro = asyncio.start_server(handleClient, host, port, loop=loop)
